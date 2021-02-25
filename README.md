@@ -15,9 +15,9 @@ redirect to IAM for authentication and generate a JWT token which embeds `iam_ac
 - Timely Token refreshes
 
 ## Usage
-Gather all required params and deploy as a Docker container to Cloud foundry or other hosting service. Make
+Gather all required params and deploy as a Docker container to Cloud foundry or other hosting service.
 The upstream should check for presence of the JWT and validate it using the `SharedSecret`. You can perform
-an IAM introspect with the access token claim to retrieve addtional permissions for the user.
+an IAM Introspect call with the access token claim to retrieve addtional permissions for the user.
 
 ## Parameters
 Setting parameters is done through the environment:
