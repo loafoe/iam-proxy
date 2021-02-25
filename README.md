@@ -1,7 +1,13 @@
 # iam-proxy
 HSDP IAM proxy. Position this in front of your app for instant HSDP IAM support. The proxy will
-redirect to IAM for login and generate a JWT token which embeds `iam_access_token` and 
+redirect to IAM for authentication and generate a JWT token which embeds `iam_access_token` and 
 `iam_refresh_token` claims containing the IAM tokens for use in your upstream service.
+
+## Features
+- Extremely lean, should run in 16MB RAM
+- Minimal configuration needs
+- Stateless, so scalable if needed
+- Single purpose
 
 ## TODO
 - Encrypt IAM claims with `SharedSecret`
@@ -40,7 +46,7 @@ Setting parameters is done through the environment:
 
 ## Contact / Getting help
 
-TODO
+Ask on the `#terraform` channel on HSDP Slack. We intend to provide a Terraform module shortly, which will be the preferred method for deployment.
 
-# Lience
+# License
 License is MIT
