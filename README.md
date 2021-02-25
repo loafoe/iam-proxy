@@ -30,7 +30,7 @@ Setting parameters is done through the environment:
 | IAM_PROXY_CLIENT_ID      | The HSDP IAM OAuth2 client ID to use | |
 | IAM_PROXY_CLIENT_SECRET  | THe HSDP IAM OAuth2 client Secret to use | |
 | IAM_PROXY_SHARED_SECRET  | The `SharedSecret` to use | `secret` |
-| IAM_PROXY_COOKIE_DOMAIN  | The Cookie domain | infered from browser URL |
+| IAM_PROXY_COOKIE_DOMAIN  | The Cookie domain | inferred from browser URL |
 | IAM_PROXY_UPSTREAM_URL   | The Upstream URL of the app to proxy | |
 | IAM_PROXY_PORT           | The port to listen on for connections | `35444` |
 
