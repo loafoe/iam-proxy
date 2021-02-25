@@ -1,0 +1,13 @@
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+/*.env
+/*.yml
+/logproxy
+profile_file.out
+config.yml
+/build/
+/.scannerwork/
