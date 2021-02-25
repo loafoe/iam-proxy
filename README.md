@@ -41,7 +41,7 @@ Setting parameters is done through the environment:
 
 ## Deploying
 ```shell
-> docker --run --rm -it iam-proxy:latest -e ... -e ...`
+> docker run --rm -it -p 35444:35444 -e IAM_PROXY_APP_URL=... -e IAM_PROXY_REGION=... -e ... iam-proxy:latest`
 ```
 
 ## Contact / Getting help
