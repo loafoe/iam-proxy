@@ -28,6 +28,10 @@ type appConfig struct {
 	LoginURI     string
 }
 
+const (
+	cookieName = "IAMProxy"
+)
+
 func main() {
 	// Config gathering
 	viper.SetEnvPrefix("iam_proxy")
@@ -77,12 +81,12 @@ func main() {
 	r := e.Group("/*")
 	r.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 		SigningKey:  []byte(cfg.SharedSecret),
-		TokenLookup: "cookie:Authorization",
+		TokenLookup: fmt.Sprintf("cookie:%s", cookieName),
 		ErrorHandlerWithContext: func(err error, c echo.Context) error {
 			return c.Redirect(http.StatusTemporaryRedirect, cfg.LoginURI+"?error="+err.Error())
 		},
 		SuccessHandler: func(c echo.Context) {
-			cookie, err := c.Cookie("Authorization")
+			cookie, err := c.Cookie(cookieName)
 			if err != nil {
 				_ = c.JSON(http.StatusForbidden, "missing cookie")
 				return
@@ -157,11 +161,20 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		token := jwt.New(jwt.SigningMethodHS256)
 		introspect, _, _ := iamClient.Introspect()
 
+		user, _, err := iamClient.Users.GetUserByID(introspect.Sub)
+		if err != nil {
+			fmt.Printf("error getting user: %v\n", err)
+		}
+
 		// Set claims
 		claims := token.Claims.(jwt.MapClaims)
 		if introspect != nil {
 			claims["username"] = introspect.Username
 			claims["sub"] = introspect.Sub
+		}
+		if user != nil {
+			claims["email"] = user.EmailAddress
+			claims["name"] = fmt.Sprintf("%s %s", user.Name.Given, user.Name.Family)
 		}
 		claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
 		claims["iam_access_token"] = iamClient.Token()
@@ -174,7 +187,7 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		}
 		// Set Cookie
 		c.SetCookie(&http.Cookie{
-			Name:     "Authorization",
+			Name:     cookieName,
 			Value:    t,
 			Path:     "/",
 			Domain:   cfg.CookieDomain,
