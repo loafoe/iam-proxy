@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rsa"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -26,6 +28,7 @@ type appConfig struct {
 	Port         string
 	RedirectURI  string
 	LoginURI     string
+	PrivateKey   *rsa.PrivateKey
 }
 
 const (
@@ -41,6 +44,7 @@ func main() {
 	viper.SetDefault("region", "us-east")
 	viper.SetDefault("environment", "client-test")
 	viper.SetDefault("shared_secret", "secret")
+	viper.SetDefault("private_key_base64", "")
 	viper.SetDefault("cookie_domain", "")
 	viper.SetDefault("upstream_url", "")
 	viper.SetDefault("port", "35444")
@@ -56,7 +60,16 @@ func main() {
 		SharedSecret: viper.GetString("shared_secret"),
 		CookieDomain: viper.GetString("cookie_domain"),
 	}
-
+	pemData, err := base64.StdEncoding.DecodeString(viper.GetString("private_key_base64"))
+	if err != nil {
+		fmt.Printf("private_key_base64 is invalid or empty\n")
+		return
+	}
+	cfg.PrivateKey, err = jwt.ParseRSAPrivateKeyFromPEM(pemData)
+	if err != nil {
+		fmt.Printf("invalid private_key: %v\n", err)
+		return
+	}
 	if cfg.CookieDomain == "" {
 		app, _ := url.Parse(cfg.APPURL)
 		cfg.CookieDomain = app.Host
@@ -80,8 +93,9 @@ func main() {
 	// Restricted group
 	r := e.Group("/*")
 	r.Use(middleware.JWTWithConfig(middleware.JWTConfig{
-		SigningKey:  []byte(cfg.SharedSecret),
-		TokenLookup: fmt.Sprintf("cookie:%s", cookieName),
+		SigningKey:    cfg.PrivateKey.Public(),
+		SigningMethod: "RS256",
+		TokenLookup:   fmt.Sprintf("cookie:%s", cookieName),
 		ErrorHandlerWithContext: func(err error, c echo.Context) error {
 			return c.Redirect(http.StatusTemporaryRedirect, cfg.LoginURI+"?error="+err.Error())
 		},
@@ -158,7 +172,7 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 			return err
 		}
 		// Create token
-		token := jwt.New(jwt.SigningMethodHS256)
+		token := jwt.New(jwt.SigningMethodRS256)
 		introspect, _, _ := iamClient.Introspect()
 
 		user, _, err := iamClient.Users.GetUserByID(introspect.Sub)
@@ -183,7 +197,7 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		claims["iam_refresh_token"] = iamClient.RefreshToken()
 
 		// Generate encoded token and send it as response.
-		t, err := token.SignedString([]byte(cfg.SharedSecret))
+		t, err := token.SignedString(cfg.PrivateKey)
 		if err != nil {
 			return err
 		}
