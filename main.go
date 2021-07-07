@@ -74,7 +74,7 @@ func main() {
 	e.GET("/callback", callbackHandler(cfg))
 
 	// Restricted group
-	r := e.Group("/")
+	r := e.Group("/*")
 	r.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 		SigningKey:  []byte(cfg.SharedSecret),
 		TokenLookup: "cookie:Authorization",
