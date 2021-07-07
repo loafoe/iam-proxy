@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/philips-software/go-hsdp-api/config"
@@ -175,6 +175,8 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		if user != nil {
 			claims["email"] = user.EmailAddress
 			claims["name"] = fmt.Sprintf("%s %s", user.Name.Given, user.Name.Family)
+			claims["given_name"] = user.Name.Given
+			claims["family_name"] = user.Name.Family
 		}
 		claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
 		claims["iam_access_token"] = iamClient.Token()
@@ -193,8 +195,6 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 			Domain:   cfg.CookieDomain,
 			HttpOnly: true,
 		})
-		return c.JSON(http.StatusOK, map[string]string{
-			"token": t,
-		})
+		return c.Redirect(http.StatusFound, "/")
 	}
 }
