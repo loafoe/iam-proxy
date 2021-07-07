@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/philips-software/go-hsdp-api/config"
 	"github.com/philips-software/go-hsdp-api/iam"
 	"github.com/spf13/viper"
-	"net/http"
-	"net/url"
-	"time"
 )
 
 type appConfig struct {
@@ -79,6 +80,14 @@ func main() {
 		TokenLookup: "cookie:Authorization",
 		ErrorHandlerWithContext: func(err error, c echo.Context) error {
 			return c.Redirect(http.StatusTemporaryRedirect, cfg.LoginURI+"?error="+err.Error())
+		},
+		SuccessHandler: func(c echo.Context) {
+			cookie, err := c.Cookie("Authorization")
+			if err != nil {
+				_ = c.JSON(http.StatusForbidden, "missing cookie")
+				return
+			}
+			c.Request().Header.Set("X-JWT-Assertion", cookie.Value)
 		},
 	}))
 
