@@ -110,6 +110,9 @@ func main() {
 			return c.Redirect(http.StatusTemporaryRedirect, cfg.LoginURI+"?error="+err.Error())
 		},
 		SuccessHandler: func(c echo.Context) {
+			if c.IsWebSocket() {
+				return
+			}
 			cookie, err := c.Cookie(cookieName)
 			if err != nil {
 				_ = c.JSON(http.StatusForbidden, "missing cookie")
@@ -177,7 +180,7 @@ func wellKnownHandler(cfg appConfig) echo.HandlerFunc {
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Acme Co"},
+			Organization: []string{"iam-proxy"},
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
