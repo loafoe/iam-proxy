@@ -1,16 +1,25 @@
 package main
 
 import (
+	"bytes"
+	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base32"
 	"encoding/base64"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/philips-software/go-hsdp-api/config"
 	"github.com/philips-software/go-hsdp-api/iam"
 	"github.com/spf13/viper"
@@ -88,6 +97,7 @@ func main() {
 
 	// IAM flow handling
 	e.GET("/login", loginHandler(cfg))
+	e.GET("/.well-known/jwks.json", wellKnownHandler(cfg))
 	e.GET("/callback", callbackHandler(cfg))
 
 	// Restricted group
@@ -123,6 +133,84 @@ func main() {
 
 	// Go go go!
 	e.Logger.Fatal(e.Start(":" + cfg.Port))
+}
+
+type Keys struct {
+	Keys []jwk.Key `json:"keys"`
+}
+
+func keyIDEncode(b []byte) string {
+	s := strings.TrimRight(base32.StdEncoding.EncodeToString(b), "=")
+	var buf bytes.Buffer
+	var i int
+	for i = 0; i < len(s)/4-1; i++ {
+		start := i * 4
+		end := start + 4
+		buf.WriteString(s[start:end] + ":")
+	}
+	buf.WriteString(s[i*4:])
+	return buf.String()
+}
+
+func keyIDFromCryptoKey(pubKey crypto.PublicKey) string {
+	derBytes, err := x509.MarshalPKIXPublicKey(pubKey)
+	if err != nil {
+		return ""
+	}
+	hasher := crypto.SHA256.New()
+	hasher.Write(derBytes)
+	return keyIDEncode(hasher.Sum(nil)[:30])
+}
+
+func wellKnownHandler(cfg appConfig) echo.HandlerFunc {
+	key, _ := jwk.New(cfg.PrivateKey.Public())
+	publicKey := cfg.PrivateKey.Public()
+
+	var notBefore time.Time
+	notBefore = time.Now()
+
+	notAfter := notBefore.Add(time.Minute * 86400 * 90)
+
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)
+	keyUsage := x509.KeyUsageDigitalSignature
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Acme Co"},
+		},
+		NotBefore: notBefore,
+		NotAfter:  notAfter,
+
+		KeyUsage:              keyUsage,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+	template.IsCA = true
+	template.KeyUsage |= x509.KeyUsageCertSign
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey, cfg.PrivateKey)
+	if err != nil {
+		fmt.Printf("ERROR CREATING DER......\n")
+	}
+	str := base64.StdEncoding.EncodeToString(derBytes)
+	fmt.Printf("x5c: [%s]\n", str)
+
+	if key != nil {
+		_ = key.Set("use", "sig")
+		_ = key.Set("alg", "RS256")
+		_ = key.Set("kid", keyIDFromCryptoKey(cfg.PrivateKey.Public()))
+		_ = key.Set(jwk.X509CertChainKey, []string{str})
+	}
+
+	return func(c echo.Context) error {
+		if key == nil {
+			return c.JSON(http.StatusOK, []interface{}{})
+		}
+		return c.JSON(http.StatusOK, Keys{
+			Keys: []jwk.Key{key},
+		})
+	}
 }
 
 type virtualHostRoundTripper struct {
@@ -179,6 +267,7 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		if err != nil {
 			fmt.Printf("error getting user: %v\n", err)
 		}
+		token.Header["kid"] = keyIDFromCryptoKey(cfg.PrivateKey.Public())
 
 		// Set claims
 		claims := token.Claims.(jwt.MapClaims)
@@ -195,6 +284,8 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 		claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
 		claims["iam_access_token"] = iamClient.Token()
 		claims["iam_refresh_token"] = iamClient.RefreshToken()
+		claims["aud"] = cfg.ClientID
+		//claims["iss"] = fmt.Sprintf("https://%s", cfg.CookieDomain)
 
 		// Generate encoded token and send it as response.
 		t, err := token.SignedString(cfg.PrivateKey)
