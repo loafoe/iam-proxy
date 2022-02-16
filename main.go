@@ -285,7 +285,11 @@ func callbackHandler(cfg appConfig) echo.HandlerFunc {
 			claims["family_name"] = user.Name.Family
 		}
 		claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
-		claims["iam_access_token"] = iamClient.Token()
+		accessToken, err := iamClient.Token()
+		if err != nil {
+			return err
+		}
+		claims["iam_access_token"] = accessToken
 		claims["iam_refresh_token"] = iamClient.RefreshToken()
 		claims["aud"] = cfg.ClientID
 		//claims["iss"] = fmt.Sprintf("https://%s", cfg.CookieDomain)
