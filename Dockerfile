@@ -1,4 +1,5 @@
 FROM golang:1.18rc1-alpine3.14 AS build
+RUN apk update && apk add git
 WORKDIR /src
 ENV CGO_ENABLED=0
 COPY go.* .
