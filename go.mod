@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/labstack/echo/v4 v4.7.2
-	github.com/lestrrat-go/jwx v1.2.20
+	github.com/lestrrat-go/jwx v1.2.24
 	github.com/philips-software/go-hsdp-api v0.61.9
 	github.com/spf13/afero v1.8.1 // indirect
 	github.com/spf13/viper v1.10.1
